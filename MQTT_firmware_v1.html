@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html><meta charset="UTF-8">
+    <head>
+		<script  type="text/javascript" src="mqttws3.wCookies.js"></script>
+	</head>
+	<body>
+
+		<div id="consoleOutput"></div>
+		<script>
+
+			var settings;
+			window.onload = function() {
+			
+				setTimeout(function(){
+					try{
+						let appMsg = window.AppInventor.getWebViewString();
+//						let appMsg = '[false,"","","broker.hivemq.com",8000,"testTopicReceive"]';
+						settings = JSON.parse(appMsg);
+						settings[4] = parseInt(settings[4]);
+						
+						client = new Paho.MQTT.Client(settings[3], settings[4], "3dip/mqtt/" + Math.floor(Math.random()*100));
+						client.onConnectionLost = onConnectionLost;
+						client.onMessageArrived = onMessageArrived;
+						client.connect(makeConnectionOptions(settings));
+					
+					} catch(e){ printMessage(e); }
+				},2000);
+			}
+			
+			function waitForInstructions(){
+				setInterval(function(){
+					try{
+						let appMsg = window.AppInventor.getWebViewString();
+						if(appMsg !== ""){
+							let instructions = JSON.parse(appMsg);
+							
+							window.AppInventor.setWebViewString("");
+							if(typeof(instructions[0]) === "object"){
+								instructions[0] = JSON.stringify(instructions[0]);
+							}
+							MQTTsend(instructions[0], instructions[1])
+						}
+					} catch(e){ printMessage(e);}
+				},1000);
+			}
+
+			//settings example: [true,"userTest","pasword123"]
+			function makeConnectionOptions(settings){
+				let options = {
+					"onSuccess":onConnect,
+					"onFailure":onConnectionLost,
+				}
+				if(settings[0] === true){
+					options.useSSL = true,
+					options.userName=settings[1],
+					options.password = settings[2]
+				}
+				return options;
+			}
+			
+			function onConnect() {
+				printMessage("Connected!");
+				client.subscribe(settings[5]);
+				window.AppInventor.setWebViewString("");
+				waitForInstructions();
+			}
+
+			function onConnectionLost(responseObject) {
+				printMessage(responseObject.errorMessage);
+			}
+
+			function onMessageArrived(message) {
+				printMessage('Received: ' + message.payloadString);
+			}
+
+            function MQTTsend(output="0", destination=topic) {
+				let message = new Paho.MQTT.Message(output);
+				
+				message.destinationName = destination;
+				client.send(message);
+				printMessage('Sent: ' + output);
+            }
+
+			function printMessage(message){
+				document.getElementById('consoleOutput').innerHTML = document.getElementById('consoleOutput').innerHTML + '<div>' + message + '</div>';
+				document.documentElement.scrollTop = document.documentElement.scrollHeight;
+			}
+			
+		</script>
+	</body>
+</html>
